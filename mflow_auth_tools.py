@@ -162,6 +162,8 @@ def parse_args():
     parser.add_argument("-p", "--password", type=str, default=None, help="user password")
     parser.add_argument("-e", "--experiment-name", type=str, default=None, help="experiment name")
     parser.add_argument("-t", "--tracking-uri", type=str, default=None, help="tracking uri")
+    # TODO: add options from MLFlow
+    parser.add_argument("--perrmision", type=str, default=None, help="user permission")
     parser.add_argument(
         "--mlflow-username",
         type=str,
@@ -182,12 +184,12 @@ def main():
     args = parse_args()
 
     try:
-        cfg_yaml = yaml.safe_load("./config.yaml")
+        cfg_yaml = yaml.safe_load("config.yaml")
         tracking_uri = cfg_yaml["tracking_uri"]
         mlflow_username = cfg_yaml["MLFLOW_TRACKING_USERNAME"]
         mlflow_password = cfg_yaml["MLFLOW_TRACKING_PASSWORD"]
     except Exception:
-        print("> Failed to load ./config.yaml. Falling back to launch arguments.")
+        print("> Failed to load config.yaml. Falling back to launch arguments.")
         try:
             if args.tracking_uri is None:
                 raise ValueError
@@ -203,7 +205,11 @@ def main():
             print(
                 "> WARNING: No MLFLOW USERNAME for auth has been provided. Falling back to the 'MLFLOW_TRACKING_USERNAME' env variable."
             )
-            mlflow_username = os.environ["MLFLOW_TRACKING_USERNAME"]
+            try:
+                mlflow_username = os.environ["MLFLOW_TRACKING_USERNAME"]
+            except KeyError:
+                print("> ERROR: No MLFLOW_TRACKING_USERNAME has been provided.")
+                exit()
         try:
             if args.mlflow_password is None:
                 raise ValueError
@@ -212,7 +218,11 @@ def main():
             print(
                 "> WARNING: No MLFLOW PASSWORD for auth has been provided. Falling back to the 'MLFLOW_TRACKING_PASSWORD' env variable."
             )
-            mlflow_password = os.environ["MLFLOW_TRACKING_PASSWORD"]
+            try:
+                mlflow_password = os.environ["MLFLOW_TRACKING_PASSWORD"]
+            except KeyError:
+                print("> ERROR: No MLFLOW_TRACKING_PASSWORD has been provided.")
+                exit()
 
     print(f"> Will authenticate as: {mlflow_username}")
     os.environ["MLFLOW_TRACKING_USERNAME"] = mlflow_username
