@@ -19,7 +19,7 @@ This collection of tools allows for MLflow basic auth management.
    ```bash
    export MLFLOW_TRACKING_USERNAME=admin
    export MLFLOW_TRACKING_PASSWORD=password
-   ./mlflow_auth.tools.py [...]
+   ./mlflow_auth_tools.py [...]
    ```
 
 2. Provide the tracking uri of the MLflow instance via `config.yaml` file (see above) or by launch arg `--tracking-uri http://localhost:5000/`.
