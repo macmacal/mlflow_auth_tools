@@ -2,6 +2,8 @@
 import os
 import argparse
 import yaml
+import json
+from pathlib import Path
 from getpass import getpass
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -88,8 +90,8 @@ def cmd_get_user(cfg: Config):
     if cfg.user is None:
         cfg.user = input("> Enter user name: ")
 
-    msg = cfg.mlflow_auth_client.get_user(username=cfg.user)
-    print(f"> Result: {msg}")
+    user_data = cfg.mlflow_auth_client.get_user(username=cfg.user)
+    print(f"> Result: {json.dumps(user_data.to_json(), indent=4)}")
 
 
 def cmd_get_experiment(cfg: Config):
@@ -97,16 +99,18 @@ def cmd_get_experiment(cfg: Config):
         cfg.experiment_name = input("> Enter experiment name: ")
 
     msg = cfg.mlflow_client.get_experiment_by_name(name=cfg.experiment_name)
-    print(f"> Result: {msg}")
+    print(f"> Result: \n{msg.to_proto()}")
 
 
-def cmd_add_user_permission(cfg: Config):
+def cmd_set_user_permission(cfg: Config):
     if cfg.user is None:
         cfg.user = input("> Enter user name: ")
     if cfg.experiment_name is None:
         cfg.experiment_name = input("> Enter experiment name: ")
     if cfg.permission is None:
         cfg.permission = input("> Enter permission (e.g. MANAGE): ")
+        if cfg.permission not in PERMISSIONS:
+            raise ValueError(f"Please select one of the MLflow permissions: {PERMISSIONS}.")
 
     try:
         cfg.mlflow_auth_client.create_experiment_permission(
@@ -143,9 +147,11 @@ COMMANDS: dict[str, Callable] = {
     "disable-admin": cmd_disable_admin,
     "get-user": cmd_get_user,
     "get-experiment": cmd_get_experiment,
-    "add-user-permission": cmd_add_user_permission,
+    "set-user-permission": cmd_set_user_permission,
     "remove-user-permission": cmd_remove_user_permission,
 }
+
+PERMISSIONS = ("READ", "EDIT", "MANAGE", "NO_PERMISSIONS")
 
 
 def parse_args():
@@ -153,7 +159,7 @@ def parse_args():
 
     parser.add_argument(
         "-c" "--command",
-        default="get-users",
+        default="get-user",
         choices=COMMANDS.keys(),
         required=True,
         help="select command for interacting with MLflow basic auth",
@@ -162,8 +168,13 @@ def parse_args():
     parser.add_argument("-p", "--password", type=str, default=None, help="user password")
     parser.add_argument("-e", "--experiment-name", type=str, default=None, help="experiment name")
     parser.add_argument("-t", "--tracking-uri", type=str, default=None, help="tracking uri")
-    # TODO: add options from MLFlow
-    parser.add_argument("--perrmision", type=str, default=None, help="user permission")
+    parser.add_argument(
+        "--permission",
+        choices=PERMISSIONS,
+        type=str,
+        default=None,
+        help="user permission",
+    )
     parser.add_argument(
         "--mlflow-username",
         type=str,
@@ -184,7 +195,9 @@ def main():
     args = parse_args()
 
     try:
-        cfg_yaml = yaml.safe_load("config.yaml")
+        yaml_path = Path(__file__).parent / "config.yaml"
+        with open(yaml_path) as f:
+            cfg_yaml = yaml.safe_load(f)
         tracking_uri = cfg_yaml["tracking_uri"]
         mlflow_username = cfg_yaml["MLFLOW_TRACKING_USERNAME"]
         mlflow_password = cfg_yaml["MLFLOW_TRACKING_PASSWORD"]
@@ -232,15 +245,17 @@ def main():
         tracking_uri=tracking_uri,
         user=args.user,
         password=args.password,
+        permission=args.permission,
         experiment_name=args.experiment_name,
         mlflow_auth_client=get_app_client("basic-auth", tracking_uri=tracking_uri),
         mlflow_client=MlflowClient(tracking_uri=tracking_uri),
     )
 
+    command = args.c__command
     try:
-        cmd = COMMANDS[args.command]
+        cmd = COMMANDS[command]
         cmd(cfg)
-        print(f"> {args.command} - Done.")
+        print(f"> {command} - Done.")
     except Exception as e:
         print(f"> An exception occurred: {e}")
 
